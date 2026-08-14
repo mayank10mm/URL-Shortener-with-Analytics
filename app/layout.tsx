@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
+import { neobrutalism } from "@clerk/themes";
 import { Archivo_Black, IBM_Plex_Mono, Space_Grotesk } from "next/font/google";
 import { SiteHeader } from "@/components/site-header";
 import "./globals.css";
@@ -31,7 +32,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <ClerkProvider
       appearance={{
-        theme: "neobrutalism",
+        theme: neobrutalism,
         variables: {
           fontFamily: "var(--font-ui)",
           fontFamilyButtons: "var(--font-ui)",

@@ -1,5 +1,6 @@
 import "server-only";
 
+import { headers } from "next/headers";
 import { and, count, desc, eq, sql } from "drizzle-orm";
 import { customAlphabet } from "nanoid";
 import { getDb } from "@/lib/db";
@@ -33,8 +34,24 @@ function cacheKey(code: string) {
   return redisKey(`code:${code}`);
 }
 
-function shortUrlFor(code: string) {
-  return `${env.appUrl.replace(/\/$/, "")}/${code}`;
+function shortUrlFor(code: string, origin: string) {
+  return `${origin.replace(/\/$/, "")}/${code}`;
+}
+
+async function originForShortLinks() {
+  const headerList = await headers();
+  const host = (headerList.get("x-forwarded-host") ?? headerList.get("host") ?? "")
+    .split(",")[0]
+    .trim();
+
+  if (host) {
+    const isLocal = host.includes("localhost") || host.startsWith("127.0.0.1");
+    const proto =
+      headerList.get("x-forwarded-proto") ?? (isLocal ? "http" : "https");
+    return `${proto}://${host}`;
+  }
+
+  return env.appUrl;
 }
 
 function generateCode() {
@@ -58,6 +75,7 @@ export async function cacheLink(link: CachedLink & { code: string }) {
 
 export async function createShortLink(rawUrl: string, userId: string) {
   const originalUrl = normalizeAndValidateUrl(rawUrl);
+  const origin = await originForShortLinks();
 
   for (let attempt = 0; attempt < 5; attempt += 1) {
     const code = generateCode();
@@ -77,7 +95,7 @@ export async function createShortLink(rawUrl: string, userId: string) {
         id: created.id,
         code: created.code,
         originalUrl: created.originalUrl,
-        shortUrl: shortUrlFor(created.code),
+        shortUrl: shortUrlFor(created.code, origin),
         createdAt: created.createdAt,
       };
     } catch (error) {
@@ -135,6 +153,7 @@ export async function logClick(input: {
 }
 
 export async function listLinks(userId: string) {
+  const origin = await originForShortLinks();
   const rows = await getDb()
     .select({
       id: links.id,
@@ -152,11 +171,12 @@ export async function listLinks(userId: string) {
   return rows.map((row) => ({
     ...row,
     clickCount: Number(row.clickCount),
-    shortUrl: shortUrlFor(row.code),
+    shortUrl: shortUrlFor(row.code, origin),
   }));
 }
 
 export async function getLinkStats(id: string, userId: string) {
+  const origin = await originForShortLinks();
   const [link] = await getDb()
     .select()
     .from(links)
@@ -224,7 +244,7 @@ export async function getLinkStats(id: string, userId: string) {
 
   return {
     ...link,
-    shortUrl: shortUrlFor(link.code),
+    shortUrl: shortUrlFor(link.code, origin),
     clickCount: Number(totals?.total ?? 0),
     byCountry: byCountry.map((row) => ({
       country: row.country ?? "XX",

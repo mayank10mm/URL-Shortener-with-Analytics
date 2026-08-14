@@ -29,14 +29,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <ClerkProvider
-      appearance={{
-        variables: {
-          fontFamily: "var(--font-ui)",
-          fontFamilyButtons: "var(--font-ui)",
-        },
-      }}
-    >
+    <ClerkProvider>
       <html
         lang="en"
         className={`${display.variable} ${ui.variable} ${mono.variable} dark h-full`}

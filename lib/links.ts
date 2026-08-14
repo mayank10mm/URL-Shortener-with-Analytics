@@ -2,10 +2,10 @@ import "server-only";
 
 import { and, count, desc, eq, sql } from "drizzle-orm";
 import { customAlphabet } from "nanoid";
-import { db } from "@/lib/db";
+import { getDb } from "@/lib/db";
 import { clicks, links } from "@/lib/db/schema";
 import { env } from "@/lib/env";
-import { redis, redisKey } from "@/lib/redis";
+import { getRedis, redisKey } from "@/lib/redis";
 import { normalizeAndValidateUrl } from "@/lib/url";
 
 const nanoid = customAlphabet(
@@ -50,7 +50,7 @@ export function isValidShortCode(code: string) {
 }
 
 export async function cacheLink(link: CachedLink & { code: string }) {
-  await redis.set(cacheKey(link.code), {
+  await getRedis().set(cacheKey(link.code), {
     id: link.id,
     originalUrl: link.originalUrl,
   } satisfies CachedLink);
@@ -62,7 +62,7 @@ export async function createShortLink(rawUrl: string, userId: string) {
   for (let attempt = 0; attempt < 5; attempt += 1) {
     const code = generateCode();
     try {
-      const [created] = await db
+      const [created] = await getDb()
         .insert(links)
         .values({ code, originalUrl, userId })
         .returning();
@@ -95,12 +95,12 @@ export async function createShortLink(rawUrl: string, userId: string) {
 export async function resolveLink(code: string): Promise<CachedLink | null> {
   if (!isValidShortCode(code)) return null;
 
-  const cached = await redis.get<CachedLink>(cacheKey(code));
+  const cached = await getRedis().get<CachedLink>(cacheKey(code));
   if (cached?.id && cached.originalUrl) {
     return cached;
   }
 
-  const [row] = await db
+  const [row] = await getDb()
     .select({
       id: links.id,
       originalUrl: links.originalUrl,
@@ -124,7 +124,7 @@ export async function logClick(input: {
   os: string | null;
   referrer: string | null;
 }) {
-  await db.insert(clicks).values({
+  await getDb().insert(clicks).values({
     linkId: input.linkId,
     country: input.country,
     device: input.device,
@@ -135,7 +135,7 @@ export async function logClick(input: {
 }
 
 export async function listLinks(userId: string) {
-  const rows = await db
+  const rows = await getDb()
     .select({
       id: links.id,
       code: links.code,
@@ -157,20 +157,20 @@ export async function listLinks(userId: string) {
 }
 
 export async function getLinkStats(id: string, userId: string) {
-  const [link] = await db
+  const [link] = await getDb()
     .select()
     .from(links)
     .where(and(eq(links.id, id), eq(links.userId, userId)))
     .limit(1);
   if (!link) return null;
 
-  const [totals] = await db
+  const [totals] = await getDb()
     .select({ total: count() })
     .from(clicks)
     .where(eq(clicks.linkId, id));
 
   const [byCountry, byDevice, byBrowser, byDay, recent] = await Promise.all([
-    db
+    getDb()
       .select({
         country: clicks.country,
         count: count(),
@@ -179,7 +179,7 @@ export async function getLinkStats(id: string, userId: string) {
       .where(eq(clicks.linkId, id))
       .groupBy(clicks.country)
       .orderBy(desc(count())),
-    db
+    getDb()
       .select({
         device: clicks.device,
         count: count(),
@@ -188,7 +188,7 @@ export async function getLinkStats(id: string, userId: string) {
       .where(eq(clicks.linkId, id))
       .groupBy(clicks.device)
       .orderBy(desc(count())),
-    db
+    getDb()
       .select({
         browser: clicks.browser,
         count: count(),
@@ -197,7 +197,7 @@ export async function getLinkStats(id: string, userId: string) {
       .where(eq(clicks.linkId, id))
       .groupBy(clicks.browser)
       .orderBy(desc(count())),
-    db
+    getDb()
       .select({
         day: sql<string>`to_char(date_trunc('day', ${clicks.clickedAt}), 'YYYY-MM-DD')`,
         count: count(),
@@ -206,7 +206,7 @@ export async function getLinkStats(id: string, userId: string) {
       .where(eq(clicks.linkId, id))
       .groupBy(sql`date_trunc('day', ${clicks.clickedAt})`)
       .orderBy(sql`date_trunc('day', ${clicks.clickedAt})`),
-    db
+    getDb()
       .select({
         id: clicks.id,
         clickedAt: clicks.clickedAt,

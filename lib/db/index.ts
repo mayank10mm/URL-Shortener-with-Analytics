@@ -5,7 +5,16 @@ import { drizzle } from "drizzle-orm/neon-http";
 import { env } from "@/lib/env";
 import * as schema from "@/lib/db/schema";
 
-const sql = neon(env.databaseUrl);
+type Database = ReturnType<typeof drizzle<typeof schema>>;
 
-export const db = drizzle({ client: sql, schema });
+let cached: Database | undefined;
+
+export function getDb(): Database {
+  if (!cached) {
+    const sql = neon(env.databaseUrl);
+    cached = drizzle({ client: sql, schema });
+  }
+  return cached;
+}
+
 export { schema };

@@ -182,9 +182,9 @@ export function LinksList({ items }: { items: DashboardLink[] }) {
         {items.map((item) => (
           <li
             key={item.id}
-            className="brutal grid min-h-[88px] grid-cols-2 items-center gap-4 bg-[#141414] p-4"
+            className="brutal grid min-h-[168px] grid-cols-1 content-center gap-3 bg-[#141414] p-4 sm:min-h-[96px] sm:grid-cols-2 sm:items-center sm:gap-4"
           >
-            <div className="min-w-0 overflow-hidden pr-2">
+            <div className="min-w-0 overflow-hidden pr-0 sm:pr-2">
               {item.pinned ? (
                 <p className="mb-1 text-[10px] font-bold uppercase tracking-widest text-[#d6ff3c]">
                   Pinned
@@ -204,7 +204,7 @@ export function LinksList({ items }: { items: DashboardLink[] }) {
                 {item.originalUrl}
               </p>
             </div>
-            <div className="flex min-w-0 flex-nowrap items-center justify-end gap-2 overflow-x-auto">
+            <div className="flex min-h-[84px] flex-wrap content-center items-center gap-2 sm:min-h-0 sm:flex-nowrap sm:justify-end">
               <IconButton
                 label={copiedId === item.id ? "Copied" : "Copy"}
                 active={copiedId === item.id}

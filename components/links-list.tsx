@@ -62,26 +62,39 @@ function TrashIcon() {
   );
 }
 
+function CopyIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
+      <rect
+        x="8"
+        y="8"
+        width="11"
+        height="11"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+      />
+      <path d="M5 16V5h11" fill="none" stroke="currentColor" strokeWidth="2" />
+    </svg>
+  );
+}
+
 function IconButton({
   label,
   active,
-  danger,
   disabled,
   onClick,
   children,
 }: {
   label: string;
   active?: boolean;
-  danger?: boolean;
   disabled?: boolean;
   onClick: () => void;
   children: ReactNode;
 }) {
-  const tone = danger
-    ? "border-[#ff4d2e] text-[#ff4d2e] hover:bg-[#ff4d2e] hover:text-[#111]"
-    : active
-      ? "border-[#d6ff3c] bg-[#d6ff3c] text-[#111]"
-      : "border-[#f4efe4] text-[#f4efe4] hover:border-[#d6ff3c] hover:text-[#d6ff3c]";
+  const tone = active
+    ? "border-[#d6ff3c] bg-[#d6ff3c] text-[#111]"
+    : "border-[#f4efe4] text-[#f4efe4] hover:border-[#d6ff3c] hover:text-[#d6ff3c]";
 
   return (
     <button
@@ -90,7 +103,7 @@ function IconButton({
       title={label}
       disabled={disabled}
       onClick={onClick}
-      className={`inline-flex h-9 w-9 items-center justify-center border-[3px] transition disabled:opacity-50 ${tone}`}
+      className={`inline-flex h-9 w-9 shrink-0 items-center justify-center border-[3px] transition disabled:opacity-50 ${tone}`}
     >
       {children}
     </button>
@@ -102,6 +115,19 @@ export function LinksList({ items }: { items: DashboardLink[] }) {
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DashboardLink | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  async function copyShortUrl(item: DashboardLink) {
+    try {
+      await navigator.clipboard.writeText(item.shortUrl);
+      setCopiedId(item.id);
+      window.setTimeout(() => {
+        setCopiedId((current) => (current === item.id ? null : current));
+      }, 1500);
+    } catch {
+      setError("Could not copy that link");
+    }
+  }
 
   async function patchAction(id: string, action: "star" | "pin") {
     setError(null);
@@ -156,23 +182,37 @@ export function LinksList({ items }: { items: DashboardLink[] }) {
         {items.map((item) => (
           <li
             key={item.id}
-            className={`brutal flex flex-col gap-3 bg-[#141414] p-4 sm:flex-row sm:items-center sm:justify-between ${
-              item.pinned ? "shadow-[8px_8px_0_#d6ff3c]" : ""
-            }`}
+            className="brutal grid min-h-[88px] grid-cols-2 items-center gap-4 bg-[#141414] p-4"
           >
-            <div className="min-w-0">
+            <div className="min-w-0 overflow-hidden pr-2">
               {item.pinned ? (
                 <p className="mb-1 text-[10px] font-bold uppercase tracking-widest text-[#d6ff3c]">
                   Pinned
                 </p>
-              ) : null}
-              <p className="truncate font-bold">{item.shortUrl}</p>
-              <p className="truncate text-sm text-[#b7b09f]">
+              ) : (
+                <p className="mb-1 text-[10px] font-bold uppercase tracking-widest text-transparent">
+                  Pinned
+                </p>
+              )}
+              <p className="truncate font-bold" title={item.shortUrl}>
+                {item.shortUrl}
+              </p>
+              <p
+                className="truncate text-sm text-[#b7b09f]"
+                title={item.originalUrl}
+              >
                 {item.originalUrl}
               </p>
             </div>
-            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-              <span className="border-[3px] border-[#d6ff3c] px-2 py-1 text-xs font-bold text-[#d6ff3c]">
+            <div className="flex min-w-0 flex-nowrap items-center justify-end gap-2 overflow-x-auto">
+              <IconButton
+                label={copiedId === item.id ? "Copied" : "Copy"}
+                active={copiedId === item.id}
+                onClick={() => void copyShortUrl(item)}
+              >
+                <CopyIcon />
+              </IconButton>
+              <span className="whitespace-nowrap border-[3px] border-[#d6ff3c] px-2 py-1 text-xs font-bold text-[#d6ff3c]">
                 {item.clickCount} CLICKS
               </span>
               <IconButton
@@ -193,7 +233,6 @@ export function LinksList({ items }: { items: DashboardLink[] }) {
               </IconButton>
               <IconButton
                 label="Delete"
-                danger
                 disabled={pendingId === item.id}
                 onClick={() => setDeleteTarget(item)}
               >
@@ -201,7 +240,7 @@ export function LinksList({ items }: { items: DashboardLink[] }) {
               </IconButton>
               <Link
                 href={`/dashboard/${item.id}`}
-                className="text-xs font-bold uppercase tracking-wider text-[#ff4d2e] hover:text-[#d6ff3c]"
+                className="whitespace-nowrap text-xs font-bold uppercase tracking-wider text-[#ff4d2e] hover:text-[#d6ff3c]"
               >
                 Analytics →
               </Link>
@@ -224,7 +263,9 @@ export function LinksList({ items }: { items: DashboardLink[] }) {
             <p className="mt-3 text-sm text-[#b7b09f]">
               Are you sure you want to delete it? This cannot be undone.
             </p>
-            <p className="mt-2 truncate text-sm font-bold">{deleteTarget.shortUrl}</p>
+            <p className="mt-2 truncate text-sm font-bold">
+              {deleteTarget.shortUrl}
+            </p>
             <div className="mt-5 flex flex-wrap gap-3">
               <button
                 type="button"

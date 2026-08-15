@@ -1,7 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { ShortenForm } from "@/components/shorten-form";
+import { LinksList } from "@/components/links-list";
 import { listLinks } from "@/lib/links";
 
 export default async function DashboardPage() {
@@ -32,32 +32,7 @@ export default async function DashboardPage() {
             will not show here.
           </p>
         ) : (
-          <ul className="mt-4 space-y-3">
-            {items.map((item) => (
-              <li
-                key={item.id}
-                className="brutal flex flex-col gap-3 bg-[#141414] p-4 sm:flex-row sm:items-center sm:justify-between"
-              >
-                <div className="min-w-0">
-                  <p className="truncate font-bold">{item.shortUrl}</p>
-                  <p className="truncate text-sm text-[#b7b09f]">
-                    {item.originalUrl}
-                  </p>
-                </div>
-                <div className="flex items-center gap-4">
-                  <span className="border-[3px] border-[#d6ff3c] px-2 py-1 text-xs font-bold text-[#d6ff3c]">
-                    {item.clickCount} CLICKS
-                  </span>
-                  <Link
-                    href={`/dashboard/${item.id}`}
-                    className="text-xs font-bold uppercase tracking-wider text-[#ff4d2e] hover:text-[#d6ff3c]"
-                  >
-                    Analytics →
-                  </Link>
-                </div>
-              </li>
-            ))}
-          </ul>
+          <LinksList items={items} />
         )}
       </section>
     </main>

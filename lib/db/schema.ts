@@ -1,4 +1,5 @@
 import {
+  boolean,
   index,
   pgTable,
   text,
@@ -12,6 +13,8 @@ export const links = pgTable("links", {
   code: varchar("code", { length: 32 }).notNull().unique(),
   originalUrl: text("original_url").notNull(),
   userId: text("user_id"),
+  starred: boolean("starred").default(false).notNull(),
+  pinnedAt: timestamp("pinned_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true })
     .defaultNow()
     .notNull(),

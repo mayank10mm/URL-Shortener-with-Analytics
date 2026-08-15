@@ -1,7 +1,7 @@
 import "server-only";
 
 import { headers } from "next/headers";
-import { and, count, desc, eq, sql } from "drizzle-orm";
+import { and, count, desc, eq, isNotNull, sql } from "drizzle-orm";
 import { customAlphabet } from "nanoid";
 import { getDb } from "@/lib/db";
 import { clicks, links } from "@/lib/db/schema";
@@ -160,19 +160,105 @@ export async function listLinks(userId: string) {
       code: links.code,
       originalUrl: links.originalUrl,
       createdAt: links.createdAt,
+      starred: links.starred,
+      pinnedAt: links.pinnedAt,
       clickCount: count(clicks.id),
     })
     .from(links)
     .leftJoin(clicks, eq(clicks.linkId, links.id))
     .where(eq(links.userId, userId))
-    .groupBy(links.id, links.code, links.originalUrl, links.createdAt)
-    .orderBy(desc(links.createdAt));
+    .groupBy(
+      links.id,
+      links.code,
+      links.originalUrl,
+      links.createdAt,
+      links.starred,
+      links.pinnedAt,
+    )
+    .orderBy(sql`${links.pinnedAt} DESC NULLS LAST`, desc(links.createdAt));
 
   return rows.map((row) => ({
     ...row,
+    starred: Boolean(row.starred),
+    pinned: Boolean(row.pinnedAt),
     clickCount: Number(row.clickCount),
     shortUrl: shortUrlFor(row.code, origin),
   }));
+}
+
+const MAX_PINNED_LINKS = 5;
+
+export class PinLimitError extends Error {
+  constructor() {
+    super("You can pin at most 5 links");
+    this.name = "PinLimitError";
+  }
+}
+
+async function getOwnedLink(id: string, userId: string) {
+  const [link] = await getDb()
+    .select()
+    .from(links)
+    .where(and(eq(links.id, id), eq(links.userId, userId)))
+    .limit(1);
+  return link ?? null;
+}
+
+export async function toggleStar(id: string, userId: string) {
+  const link = await getOwnedLink(id, userId);
+  if (!link) return null;
+
+  const [updated] = await getDb()
+    .update(links)
+    .set({ starred: !link.starred })
+    .where(eq(links.id, id))
+    .returning();
+
+  return updated ?? null;
+}
+
+export async function togglePin(id: string, userId: string) {
+  const link = await getOwnedLink(id, userId);
+  if (!link) return null;
+
+  if (link.pinnedAt) {
+    const [updated] = await getDb()
+      .update(links)
+      .set({ pinnedAt: null })
+      .where(eq(links.id, id))
+      .returning();
+    return updated ?? null;
+  }
+
+  const [pinCount] = await getDb()
+    .select({ total: count() })
+    .from(links)
+    .where(and(eq(links.userId, userId), isNotNull(links.pinnedAt)));
+
+  if (Number(pinCount?.total ?? 0) >= MAX_PINNED_LINKS) {
+    throw new PinLimitError();
+  }
+
+  const [updated] = await getDb()
+    .update(links)
+    .set({ pinnedAt: new Date() })
+    .where(eq(links.id, id))
+    .returning();
+
+  return updated ?? null;
+}
+
+export async function deleteLink(id: string, userId: string) {
+  const link = await getOwnedLink(id, userId);
+  if (!link) return null;
+
+  await getDb().delete(links).where(eq(links.id, id));
+  try {
+    await getRedis().del(cacheKey(link.code));
+  } catch (error) {
+    console.error("Failed to drop Redis cache for deleted link", error);
+  }
+  return link;
 }
 
 export async function getLinkStats(id: string, userId: string) {
